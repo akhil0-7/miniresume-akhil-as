@@ -33,7 +33,7 @@ async def upload_candidate(
     file_extension = resume.filename.split(".")[-1].lower()
 
     if file_extension not in allowed_extensions:
-        raise HTTPException(status_code=400)
+        raise HTTPException(status_code=400, detail="Invalid file type")
 
     candidate_id = str(uuid4())
     file_path = os.path.join(UPLOAD_DIR, f"{candidate_id}.{file_extension}")
@@ -97,7 +97,7 @@ def get_candidate(candidate_id: str):
     for candidate in candidates:
         if candidate["id"] == candidate_id:
             return candidate
-    raise HTTPException(status_code=404)
+    raise HTTPException(status_code=404, detail="Candidate not Found")
 
 @app.delete("/candidates/{candidate_id}", status_code=200)
 def delete_candidate(candidate_id: str):
@@ -105,4 +105,4 @@ def delete_candidate(candidate_id: str):
          if candidate["id"] == candidate_id:
             candidates.remove(candidate)
             return {"message": "Candidate deleted Successfully"}
-    raise HTTPException(status_code=404)
+    raise HTTPException(status_code=404, detail="Candidate not found")
