@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from datetime import date
-from uuid import uuid4
+from uuid import uuid4 #For unique IDs for candidates
 from typing import Optional
 import os
 import shutil
@@ -23,8 +23,8 @@ async def upload_candidate(
     contact_number: str = Form(...),
     contact_address: str = Form(...),
     education_qualification: str = Form(...),
-    graduation_year: int = Form(...),
-    years_of_experience: int = Form(...),
+    graduation_year: int = Form(..., ge=2020, le=2026),
+    years_of_experience: int = Form(..., ge=0, le=15),
     skill_set: str = Form(...),
     resume: UploadFile = File(...)
 ):
