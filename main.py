@@ -1,20 +1,32 @@
-from fastapi import FastAPI, Form, UploadFile, File, HTTPException
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Depends
 from datetime import date
-from uuid import uuid4 #For unique IDs for candidates
+from uuid import uuid4
+from sqlalchemy.orm import Session
+from database import SessionLocal, engine
 from typing import Optional
 import os
 import shutil
-
+import models
 
 app = FastAPI()
-candidates = [] #Storage
+
+models.Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@app.get("/health",status_code=200)
+
+@app.get("/health")
 def health():
-    return {"Status" : "Healthy"}
+    return {"Status": "Healthy"}
+
 
 @app.post("/candidates", status_code=201)
 async def upload_candidate(
@@ -26,7 +38,8 @@ async def upload_candidate(
     graduation_year: int = Form(..., ge=2020, le=2026),
     years_of_experience: int = Form(..., ge=0, le=15),
     skill_set: str = Form(...),
-    resume: UploadFile = File(...)
+    resume: UploadFile = File(...),
+    db: Session = Depends(get_db)
 ):
 
     allowed_extensions = ["pdf", "doc", "docx"]
@@ -41,24 +54,29 @@ async def upload_candidate(
     with open(file_path, "wb") as buff:
         shutil.copyfileobj(resume.file, buff)
 
-    candidate_data = {
-        "id": candidate_id,
-        "full_name": full_name,
-        "dob": dob,
-        "contact_number": contact_number,
-        "contact_address": contact_address,
-        "education_qualification": education_qualification,
-        "graduation_year": graduation_year,
-        "years_of_experience": years_of_experience,
-        "skill_set": [skill.strip() for skill in skill_set.split(",")],
-        "resume_file": file_path
-    }
+    candidate = models.Candidate(
+        id=candidate_id,
+        full_name=full_name,
+        dob=dob,
+        contact_number=contact_number,
+        contact_address=contact_address,
+        education_qualification=education_qualification,
+        graduation_year=graduation_year,
+        years_of_experience=years_of_experience,
+        skill_set=skill_set,
+        resume_file=file_path
+    )
 
-    candidates.append(candidate_data)
+    db.add(candidate)
+    db.commit()
+    db.refresh(candidate)
 
     return {
         "message": "Candidate uploaded successfully",
-        "data": candidate_data
+        "data": {
+            "id": candidate.id,
+            "full_name": candidate.full_name
+        }
     }
 
 
@@ -66,43 +84,53 @@ async def upload_candidate(
 def list_candidates(
     skill: Optional[str] = None,
     experience: Optional[int] = None,
-    graduation_year: Optional[int] = None
+    graduation_year: Optional[int] = None,
+    db: Session = Depends(get_db)
 ):
-    
-    filtered = candidates
+
+    query = db.query(models.Candidate)
 
     if skill:
-        filtered = [
-            c for c in filtered
-            if skill.lower() in [s.lower() for s in c["skill_set"]]
-        ]
+        query = query.filter(models.Candidate.skill_set.contains(skill))
+
     if experience:
-        filtered = [
-            c for c in filtered
-            if c["years_of_experience"] >= experience
-        ]
+        query = query.filter(models.Candidate.years_of_experience >= experience)
+
     if graduation_year:
-        filtered = [
-            c for c in filtered
-            if c["graduation_year"] == graduation_year
-        ]
+        query = query.filter(models.Candidate.graduation_year == graduation_year)
+
+    candidates = query.all()
+
     return {
-        "count": len(filtered),
-        "data": filtered
+        "count": len(candidates),
+        "data": candidates
     }
 
-@app.get("/candidates/{candidate_id}", status_code=200)
-def get_candidate(candidate_id: str):
 
-    for candidate in candidates:
-        if candidate["id"] == candidate_id:
-            return candidate
-    raise HTTPException(status_code=404, detail="Candidate not Found")
+@app.get("/candidates/{candidate_id}")
+def get_candidate(candidate_id: str, db: Session = Depends(get_db)):
 
-@app.delete("/candidates/{candidate_id}", status_code=200)
-def delete_candidate(candidate_id: str):
-    for candidate in candidates:
-         if candidate["id"] == candidate_id:
-            candidates.remove(candidate)
-            return {"message": "Candidate deleted Successfully"}
-    raise HTTPException(status_code=404, detail="Candidate not found")
+    candidate = db.query(models.Candidate).filter(
+        models.Candidate.id == candidate_id
+    ).first()
+
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    return candidate
+
+
+@app.delete("/candidates/{candidate_id}")
+def delete_candidate(candidate_id: str, db: Session = Depends(get_db)):
+
+    candidate = db.query(models.Candidate).filter(
+        models.Candidate.id == candidate_id
+    ).first()
+
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    db.delete(candidate)
+    db.commit()
+
+    return {"message": "Candidate deleted successfully"}
