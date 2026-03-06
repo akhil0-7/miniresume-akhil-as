@@ -1,11 +1,21 @@
 # Mini Resume Management API
 
-#### Built using FastApi that allows uploading resume, storing candidate data and filtering.
+#### Built using FastApi that allows uploading resumes, storing candidate data, filtering candidates, and persisting data in a database.
+
+## The API supports:
+    Uploading resumes (PDF/DOC/DOCX)
+    Storing candidate metadata
+    Filtering candidates by skill, experience, or graduation year
+    Fetching candidate details
+    Deleting candidates
+Candidate data is persisted using a database instead of in-memory storage.
 
 ## Technologies Used
 #### Python 3.14.0
 #### FastApi
 #### Uvicorn
+#### SQLite
+#### SQLAlchemy
 #### Python-multipart
 
 ## Installation Steps
@@ -22,8 +32,13 @@ uvicorn main:app --reload
 
 #### Swagger UI - http://127.0.0.1:8000/docs
 
+## Database
+The application stores candidate data in a SQLite database using SQLAlchemy ORM.
+When the application runs the database file will be automatically created: (**resume.db**).
+Candidate information is stored in the candidates table.
+
 ## Filter Candidates
-You can filter candidates using- skill or experience or graduation_year.
+You can filter candidates using skill or experience or graduation_year.
 ### Examples
 #### GET /candidates?skill=python
 #### GET /candidates?experience=1
